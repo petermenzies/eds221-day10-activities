@@ -1,0 +1,101 @@
+---
+title: "Ice cover duration"
+author: "Peter Menzies"
+date: "8/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(ggExtra)
+```
+
+```{r}
+ice_cover <- read_csv(here("data", "ntl33_v7.csv"), na = c("NA", "-999"))
+
+weather <- read_csv(here("data", "ntl20_v6.csv"))
+```
+
+```{r}
+ice_cover <-ice_cover %>% 
+  group_by(lakeid) %>% 
+  mutate(median =  median(ice_duration, na.rm = TRUE))
+
+ice_plot <- ggplot(ice_cover, aes(x = lakeid, y = ice_duration)) +
+  geom_jitter() +
+  labs(x = "Lake", y = "Number of days frozen", title = "\n\nNumber of frozen days at three Madison Lake Area lakes")
+
+ggMarginal(ice_plot, type = "boxplot", groupColour = TRUE, outlier.shape = NA)
+```
+
+### Find the mean ice cover duration in Madison Lake Area
+
+```{r}
+mean_ice_cover <- ice_cover %>% 
+  group_by(year4) %>% 
+  summarize(mean = mean(ice_duration, na.rm = TRUE)) %>% 
+  filter(mean != "NaN")
+
+
+mean_yearly_ice <- ggplot(mean_ice_cover, aes(x = year4, y = mean)) +
+  geom_line() +
+  labs(x = "Year", y = "Mean number of frozen days", title = "Yearly average duration of ice at Madison Lake Area from 1851 - 2019")
+
+mean_yearly_ice
+```
+
+The figure above shows a gradual decline in average duration of ice at the three Madison Area Lakes observed.
+
+### Average air temps at Madison Lake Area
+
+```{r}
+daily_temps <- weather %>% 
+  filter(month %in% c(12, 1, 2)) %>%
+  group_by(year4) %>% 
+  summarize(avg_temp_c = mean(ave_air_temp_adjusted))
+
+daily_temps_plot <- ggplot(daily_temps, aes(x = year4, y = avg_temp_c)) +
+  geom_line() +
+  labs(x = "Year", y = "Average air tmeperature (ºC)", title = "Avergae yearly air temperatures at Madison Lake Area from 1851 - 2019")
+
+daily_temps_plot
+```
+
+The above figure shows a possible gradual increase in average air temperature.
+
+
+```{r}
+ice_temps <- full_join(daily_temps, mean_ice_cover, key = year4)
+```
+
+### Ice vs temperatures
+
+```{r}
+ice_temps_plot <- ggplot(ice_temps, aes(x = avg_temp_c, y = mean)) +
+  geom_point() +
+  labs(x = "Average air temp (ºC)", y = "Average ice duration")
+
+ice_temps_plot
+```
+
+This figure shows a negative correlation between mean air temperatures and mean ice duration.
+
+
+### Thaw date exploration
+
+```{r}
+thaw_date <- ice_cover %>% 
+  filter(year4 >= 1970) %>% 
+  mutate(ice_off = lubridate::ymd(ice_off)) %>% 
+  mutate(day = lubridate::yday(ice_off))
+#group_by(year4) %>% 
+#summarize(day = mean(day, na.rm = TRUE))
+
+thaw_date_plot <- ggplot(thaw_date, aes(x = year4, y = day)) +
+  geom_point(aes(color = lakeid))
+
+thaw_date_plot
+```
+
